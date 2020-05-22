@@ -6,7 +6,7 @@ Bayesian Model Updating is a technique which casts the model updating problem in
 * Transitional Markov Chain Monte Carlo [(TMCMC)](https://doi.org/10.1061/(ASCE)0733-9399(2007)133:7(816))
 * Sequential Monte Carlo [(SMC)](https://www.jstor.org/stable/3879283)
 
-In this repository, 4 tutorials are presented to enable users to understand how the advanced Monte Carlo techniques are implemented in addressing various Bayesian Model Updating problems. The following tutorials are (in order of increasing difficulty):
+In this repository, 3 tutorials are presented to enable users to understand how the advanced Monte Carlo techniques are implemented in addressing various Bayesian Model Updating problems. The following tutorials are (in order of increasing difficulty):
 
 * 1-Dimensional Linear Static System
 * 1-Dimensional Simple Harmonic Oscillator
