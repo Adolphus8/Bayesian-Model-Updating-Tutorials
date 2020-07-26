@@ -8,29 +8,7 @@ function [output] = TEMCMCsampler(varargin)
 % resampling procedure is now performced using the Ensemble Sampler with
 % Affine Invariance proposed by Goodman and Weare (2010) in place of the
 % Metropolis-Hastings MCMC sampler.
-%
-% Usage:
-% [samples_fT_D, fD] = tmcmc_v1(fD_T, fT, sample_from_fT, N);
-%
-% where:
-%
-% inputs:
-% log_fD_T       = function handle of log(fD_T(t)), Loglikelihood
-%
-% fT             = function handle of fT(t), Prior PDF
-%
-% sample_from_fT = handle to a function that samples from of fT(t),
-% Sampling rule function from Prior PDF
-%
-% nsamples              = number of samples of fT_D, Posterior, to generate
-%
-% outputs:
-% samples_fT_D   = samples of fT_D (N x D) = samples from Posterior
-% distribution
-%
-% log_fD         = log(evidence) = log(normalization constant)
-
-% ------------------------------------------------------------------------
+% -------------------------------------------------------------------------
 % who                    when         observations
 %--------------------------------------------------------------------------
 % Diego Andres Alvarez   Jul-24-2013  First algorithm
@@ -39,18 +17,40 @@ function [output] = TEMCMCsampler(varargin)
 % Edoardo Patelli      - edoardo.patelli@strath.ac.uk
 % Adolphus Lye         - adolphus.lye@liverpool.ac.uk
 
-% parse the information in the name/value pairs: 
-pnames = {'nsamples','loglikelihood','priorpdf','priorsamps','burnin',...
+% Parse the information in the name/value pairs: 
+pnames = {'nsamples','loglikelihood','priorpdf','priorrnd','burnin',...
           'lastburnin','stepsize','thinchain'};
 
+% Define default values: 
 dflts =  {[],[],[],[],[],0,2,3}; % define default values
       
-[nsamples,loglikelihood,priorpdf,prior_samps,burnin,lastBurnin,stepsize,thinchain] = ...
+[nsamples,loglikelihood,priorpdf,prior_rnd,burnin,lastBurnin,stepsize,thinchain] = ...
        internal.stats.parseArgs(pnames, dflts, varargin{:});
+   
+%--------------------------------------------------------------------------
+%
+% Inputs:
+% nsamples:       Scalar value of the number of samples to be generated from the Posterior;
+% loglikelihood:  A function handle of the loglikelihood function;
+% priorpdf:       Function-handle of the Prior PDF;
+% prior_rnd:      Function-handle of the Prior random number generator;
+% burnin:         Number of burn-in for all iterations up to M-1;
+% lastBurnin:     Number of burn-in for the last iteration;
+% stepsize:       The stepsize for the Ensemble sampler in the updating step (this is the tuning parameter);
+% thinchain:      Thin all the chains of the Ensemble sampler by only storing every k'th step (default=3);
+% 
+% Outputs:
+% output.samples:    A N x dim matrix of Posterior samples;
+% output.allsamples: A N x dim x (M+1) array of samples from all iterations;
+% output.acceptance: A M x 1 vector of acceptance rates for all iterations;
+% output.beta:       A M x 1 vector of beta_j values;
+% output.step:       A M x 1 vector of step-size;;
+%
+%--------------------------------------------------------------------------
    
 %% Obtain N samples from the prior pdf f(T)
 j      = 0;                   % Initialise loop for the transitional likelihood
-thetaj = prior_samps;         % theta0 = N x D
+thetaj = prior_rnd(nsamples); % theta0 = N x D
 pj     = 0;                   % p0 = 0 (initial tempering parameter)
 Dimensions = size(thetaj, 2); % size of the vector theta
 
@@ -60,8 +60,7 @@ beta_j(count) = pj;
 
 %% Initialization of matrices and vectors
 thetaj1   = zeros(nsamples, Dimensions);
-%log_fD_T_thetaj = zeros(nsamples,1);
-
+step(count) = stepsize;
 %% Main loop
 while pj < 1    
     j = j+1;
@@ -125,7 +124,7 @@ while pj < 1
     % Nsample per chain = 1;
     % smpl = Nchains x Dimension x 1 matrix
         
- [samples,logp,acceptance_rate] = EMCMCsampler(start, log_posterior, 1, ...
+ [samples,logp,acceptance_rate] = EMCMCsampler(start, log_posterior, 1, priorpdf, ...
                             'StepSize', stepsize,...
                             'BurnIn', burnin,...
                             'ThinChain', thinchain); 
@@ -156,11 +155,15 @@ while pj < 1
         %}
     
     fprintf('\n');
-    acceptance(count) = mean(acceptance_rate);
+    acceptance(count) = acceptance_rate;
     
     %% Prepare for the next iteration
+    c_a = (acceptance_rate - ((0.21./Dimensions) + 0.23));
+    stepsize = stepsize.*exp(c_a);
+    
     count = count+1;
     samps(:,:,count) = thetaj1;
+    step(count) = stepsize;
     thetaj = thetaj1;
     pj     = pj1;
     beta_j(count) = pj;
@@ -171,11 +174,11 @@ log_fD = sum(log(S(1:j)));
 
 %% Description of outputs:
 
-output.allsamples = samps;       % To show samples from all transitional distributions
-output.samples = samps(:,:,end); % To only show samples from the final posterior
+output.samples = thetaj;         % To only show samples from the final posterior
 output.log_evidence = log_fD;    % To generate the logarithmic of the evidence
 output.acceptance = acceptance;  % To show the mean acceptance rates for all iterations
 output.beta = beta_j;            % To show the values of temepring parameters, beta_j 
+output.step = step;              % To show the values of step-size
 
 return; % End
 
@@ -209,7 +212,7 @@ pj1 = min(1, pj + e);
 
 return; % End
 
-function [models,logP,acceptance]=EMCMCsampler(minit,logPfuns,Nsamples,varargin)
+function [models,logP,acceptance]=EMCMCsampler(minit,logPfuns,Nsamples,box,varargin)
 %% Cascaded affine invariant ensemble MCMC sampler. "The MCMC hammer"
 %
 % GWMCMC is an implementation of the Goodman and Weare 2010 Affine
@@ -346,17 +349,29 @@ end
 
 reject=zeros(Nwalkers,1);
 
-% models: A WxMxT matrix; logP: A WxPxT matrix
-curm = models(:,:,1);  %curm: A WxM matrix
-curlogP = logP(:,:,1); %curlogP: A WxP matrix
+% models: A WxMxT matrix; logP: WxPxT matrix
+curm = models(:,:,1);  %curm: W x M matrix
+curlogP = logP(:,:,1); %curlogP: W x P matrix
 progress(0,0,0)
 totcount=Nwalkers;
-for row=1:Nkeep
+for row = 1:Nkeep % number of samples drawn per walker
     for jj=1:p.ThinChain
         %generate proposals for all walkers
-        rix=mod((1:Nwalkers)+floor(rand*(Nwalkers-1)),Nwalkers)+1; %pick a random partner
-        zz=((p.StepSize - 1)*rand(Nwalkers,1) + 1).^2/p.StepSize;
-        proposedm=curm(rix,:) - bsxfun(@times,(curm(rix,:)-curm),zz);
+        rix = mod((1:Nwalkers)+floor(rand*(Nwalkers-1)),Nwalkers)+1; % pick a random partner (Nwalker x 1 vector)
+        
+        proposedm = zeros(Nwalkers, size(minit,2));  % Nwalkers x dim matrix
+        zz = zeros(Nwalkers, 1);                     % Nwalkers x 1 vector
+        for i = 1:Nwalkers
+        while true
+        zz(i) = ((p.StepSize - 1)*rand(1,1) + 1).^2/p.StepSize;  % scalar
+        proposedm(i,:) = curm(rix(i),:) - bsxfun(@times,(curm(rix(i),:)-curm(i,:)),zz(i)); % Nwalkers x dim matrix
+        if box(proposedm(i,:)) % The box function is the Prior PDF in the feasible region.
+        % Note: If a point is out of bounds, this function will return 0 = false.
+        break;
+        end
+        end
+        end
+        
         logrand=log(rand(Nwalkers,NPfun+1)); %moved outside because rand is slow inside parfor
         if p.Parallel
             %parallel/non-parallel code is currently mirrored in
