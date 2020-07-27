@@ -112,11 +112,6 @@ wj(i) = 1e-100;
 end
 end
 
-% Error check:
-if any(isinf(logL))
-error('The prior distribution is too far from the true region');
-end
-
 wj_norm = wj./sum(wj); % To normalise the weights
 
 %% Check step - Compute the sum of wj_norm and see if it is < nsamples/2:

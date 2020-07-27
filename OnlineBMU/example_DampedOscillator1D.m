@@ -198,7 +198,7 @@ y_neg_a2 = abs(prediction_mean(:,1) - prediction_bounds_k(:,1)); % error in the 
 y_pos_a2 = abs(prediction_mean(:,1) - prediction_bounds_k(:,2)); % error in the positive y-direction
 errorbar((t_i(2:end)), prediction_mean(1:end-1,1), y_neg_a2(1:end-1), y_pos_a2(1:end-1), '-s','MarkerSize',5,...
     'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
-legend('True values', 'Estimated values', 'Predicted values', 'linewidth', 2)
+legend('True value', 'SEMC estimated values', 'Predicted values', 'linewidth', 2)
 xlim([0 12])
 xlabel('Inspection time, t_i [mth]')
 ylabel('Stiffness, k(t_i) [N/m]')
@@ -214,7 +214,7 @@ figure;
 hold on; box on; grid on;
 plot([1 size(semc_allsamples,3)],[target_accept target_accept] , 'c','linewidth', 1.5)
 plot([1 size(semc_allsamples,3)],[0.15 0.15] , 'k','linewidth', 1.5)
-plot((1:size(semc_allsamples,3)-1)', SEMC.acceptance, '--s','linewidth', 1.5)
+plot((1:size(semc_allsamples,3)-1)', SEMC.acceptance, '--rs', 'MarkerFaceColor','r','linewidth', 1.5)
 plot([1 size(semc_allsamples,3)],[0.5 0.5] , 'k','linewidth', 1.5)
 legend('Target acceptance rate', 'Optimum acceptance limits', 'SEMC acceptance rates', 'linewidth', 2)
 title('Plot of Acceptance rates')

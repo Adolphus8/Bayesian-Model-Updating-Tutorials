@@ -207,7 +207,7 @@ y_neg_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,1)); % error in the ne
 y_pos_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,2)); % error in the positive y-direction
 errorbar((1:size(semc_allsamples,3))', posterior_mean(:,1), y_neg_a1, y_pos_a1, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'Estimated values', 'linewidth', 2)
+legend('True value', 'SEMC estimated values'', 'linewidth', 2)
 xlim([1 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Primary stiffness, k [N/m]')
@@ -220,7 +220,7 @@ y_neg_b1 = abs(posterior_mean(:,2) - posterior_bounds_k12(:,1)); % error in the 
 y_pos_b1 = abs(posterior_mean(:,2) - posterior_bounds_k12(:,2)); % error in the positive y-direction
 errorbar((1:size(semc_allsamples,3))', posterior_mean(:,2), y_neg_b1, y_pos_b1, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'Estimated values', 'linewidth', 2)
+legend('True value', 'SEMC estimated values', 'linewidth', 2)
 xlim([1 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Secondary stiffness, k_{12} [N/m]')
@@ -236,7 +236,7 @@ figure;
 hold on; box on; grid on;
 plot([1 size(semc_allsamples,3)],[target_accept target_accept] , 'c','linewidth', 1.5)
 plot([1 size(semc_allsamples,3)],[0.15 0.15] , 'k','linewidth', 1.5)
-plot((1:size(semc_allsamples,3)-1)', SEMC.acceptance, '--s','linewidth', 1.5)
+plot((1:size(semc_allsamples,3)-1)', SEMC.acceptance, '--rs', 'MarkerFaceColor','r','linewidth', 1.5)
 plot([1 size(semc_allsamples,3)],[0.5 0.5] , 'k','linewidth', 1.5)
 legend('Target acceptance rate', 'Optimum acceptance limits', 'SEMC acceptance rates', 'linewidth', 2)
 title('Plot of Acceptance rates')
