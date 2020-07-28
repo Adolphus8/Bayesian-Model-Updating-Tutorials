@@ -40,7 +40,7 @@ measurements = model(stiffness,displacement) + noise_sd*randn(Nmeasurements ,1);
 figure;
 hold on; box on; grid on;
 scatter(displacement, measurements, 13, 'r', 'filled')
-disp = linspace(0.02,0.08,50);
+disp = linspace(0.0,0.08,50);
 plot(disp, model(stiffness,disp), 'k --', 'LineWidth', 1)
 legend('Noisy measurements','True measurements','LineWidth',2)
 xlim([0.02 0.08])
@@ -135,6 +135,24 @@ xlim([0 16])
 xlabel('Iteration, j')
 ylabel('Noise standard deviation, \sigma [N]')
 set(gca, 'fontsize', 18)
+
+%% Model Update
+
+figure;
+hold on; box on; grid on;
+for i = 1:size(semc_allsamples,1)
+plot(disp, model(semc_allsamples(i,1,end),disp),'color','#C0C0C0', 'LineWidth', 1)
+end
+legend('SEMC samples','Linewidth', 2)
+plot(disp, model(stiffness,disp), 'k --', 'LineWidth', 1, 'DisplayName', 'True measurements')
+plot(disp, model(least_squares,disp), 'c', 'LineWidth', 1, 'DisplayName', 'Least-squares estimate')
+plot(disp, model(posterior_bounds_k(15,1),disp), 'm', 'LineWidth', 1, 'DisplayName', '5^{th} percentile')
+plot(disp, model(posterior_bounds_k(15,2),disp), 'm', 'LineWidth', 1, 'DisplayName', '95^{th} percentile')
+scatter(displacement, measurements, 13, 'r', 'filled', 'DisplayName', 'Noisy measurements')
+xlim([0 0.08])
+xlabel('Displacement, d [m]')
+ylabel('Force, F [N]')
+set(gca, 'Fontsize', 16)
 
 %% SEMC Statistics
 

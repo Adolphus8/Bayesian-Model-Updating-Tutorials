@@ -59,9 +59,9 @@ scatter(measurements(:,1), measurements(:,2), 10, 'r', 'filled');
 plot(model_1([m,k]), model_2([m,k,k_12]), 'k +','LineWidth', 2);
 xlabel('\omega_1^{noisy} [Hz]')
 ylabel('\omega_2^{noisy} [Hz]')
-xlim([0.9 1.4])
 legend('Noisy eigenfrequencies', 'True eigenfrequency','LineWidth',2)
 set(gca, 'fontsize', 15)
+ylim([1.5 2.8])
 hold off
 
 %% Define the Prior:
@@ -97,10 +97,10 @@ prior_rnd = @(N) [unifrnd(lowerBound(1), upperBound(1), N, 1),...
 
 logL = @(x, measurements) - 0.5 .* (1./x(:,3)).^2 .*(measurements(:,1) - model_1([m,x(:,1)]))' *...
                                       (measurements(:,1) - model_1([m,x(:,1)])) -...
-                                       length(mea).*log(sqrt(2*pi).*x(:,3)) +...
+                                       length(measurements).*log(sqrt(2*pi).*x(:,3)) +...
                           - 0.5 .* (1./x(:,4)).^2 .*(measurements(:,2) - model_2([m, x(:,1), x(:,2)]))' *...
                                       (measurements(:,2) - model_2([m, x(:,1), x(:,2)])) -...
-                                       length(mea).*log(sqrt(2*pi).*x(:,4));
+                                       length(measurements).*log(sqrt(2*pi).*x(:,4));
 
 %% Define the likelihood function cell array
 % This is to indicate measurements obtained separately at different
@@ -150,21 +150,10 @@ ylabel(ax1(1,1),'k [N/m]'); ylabel(ax1(2,1),'k_{12} [N/m]');
 ylabel(ax1(3,1),'\sigma_1 [Hz]'); ylabel(ax1(4,1),'\sigma_2 [Hz]');
 xlabel(ax1(4,1),'k [N/m]'); xlabel(ax1(4,2),'k_{12} [N/m]');
 xlabel(ax1(4,3),'\sigma_1 [Hz]'); xlabel(ax1(4,4),'\sigma_2 [Hz]');
-title(sprintf('TMCMC Posterior at Time-step = %2d \n', t-1))
+title(sprintf('SEMC Posterior at Time-step = %2d \n', t-1))
 set(gca,'FontSize',16)
 
 end
-
-%% Report the statistics of the final Posterior:
-
-fprintf('Estimation of k via TMCMC: %4.2f; standard deviation: %4.2f; COV: %3.2f%% \n',...
-mean(semc_samples(:,1)), std(semc_samples(:,1)), (std(semc_samples(:,1))/mean(semc_samples(:,1)))*100)
-fprintf('Estimation of k12 via TMCMC: %4.2f; standard deviation: %4.2f; COV: %3.2f%% \n',...
-mean(semc_samples(:,2)), std(semc_samples(:,2)), (std(semc_samples(:,2))/mean(semc_samples(:,2)))*100)
-fprintf('Estimation of sigma_1 via TMCMC: %4.2f; standard deviation: %4.2f; COV: %3.2f%% \n',...
-mean(semc_samples(:,3)), std(semc_samples(:,3)), (std(semc_samples(:,3))/mean(semc_samples(:,3)))*100)
-fprintf('Estimation of sigma_2 via TMCMC: %4.2f; standard deviation: %4.2f; COV: %3.2f%% \n',...
-mean(semc_samples(:,4)), std(semc_samples(:,4)), (std(semc_samples(:,4))/mean(semc_samples(:,4)))*100)
 
 %% Model Update
 
@@ -182,48 +171,83 @@ ylabel('\omega_2^{noisy} [Hz]')
 legend('SEMC Model Update','Noisy eigenfrequencies', 'True eigenfrequency','LineWidth',2)
 set(gca, 'fontsize', 15)
 
-posterior_mean = zeros(size(semc_allsamples,3),size(semc_allsamples,2));
-posterior_std = zeros(size(semc_allsamples,3),size(semc_allsamples,2));
-posterior_bounds_k = zeros(size(semc_allsamples,3),2);
-posterior_bounds_k12 = zeros(size(semc_allsamples,3),2);
+posterior_mean = zeros(size(logl,2),size(semc_allsamples,2));
+posterior_std = zeros(size(logl,2),size(semc_allsamples,2));
+posterior_bounds_k = zeros(size(logl,2),2);
+posterior_bounds_k12 = zeros(size(logl,2),2);
+posterior_bounds_sigma1 = zeros(size(logl,2),2);
+posterior_bounds_sigma2 = zeros(size(logl,2),2);
 
-for idx = 1:size(semc_allsamples,3)
-posterior_mean(idx,1) = mean(semc_allsamples(:,1,idx));
-posterior_mean(idx,2) = mean(semc_allsamples(:,2,idx));
+for idx = 1:size(logl,2)
+posterior_mean(idx,1) = mean(semc_allsamples(:,1,idx+1));
+posterior_mean(idx,2) = mean(semc_allsamples(:,2,idx+1));
+posterior_mean(idx,3) = mean(semc_allsamples(:,3,idx+1));
+posterior_mean(idx,4) = mean(semc_allsamples(:,4,idx+1));
 
-posterior_std(idx,1) = std(semc_allsamples(:,1,idx));
-posterior_std(idx,2) = std(semc_allsamples(:,2,idx));
+posterior_std(idx,1) = std(semc_allsamples(:,1,idx+1));
+posterior_std(idx,2) = std(semc_allsamples(:,2,idx+1));
+posterior_std(idx,3) = std(semc_allsamples(:,3,idx+1));
+posterior_std(idx,4) = std(semc_allsamples(:,4,idx+1));
 
-posterior_bounds_k(idx,:) = prctile(semc_allsamples(:,1,idx), [5, 95]);
-posterior_bounds_k12(idx,:) = prctile(semc_allsamples(:,2,idx), [5, 95]);
+posterior_bounds_k(idx,:) = prctile(semc_allsamples(:,1,idx+1), [5, 95]);
+posterior_bounds_k12(idx,:) = prctile(semc_allsamples(:,2,idx+1), [5, 95]);
+posterior_bounds_sigma1(idx,:) = prctile(semc_allsamples(:,3,idx+1), [5, 95]);
+posterior_bounds_sigma2(idx,:) = prctile(semc_allsamples(:,4,idx+1), [5, 95]);
 end
 posterior_cov = (posterior_std./posterior_mean).*100;
 
 figure;
 subplot(1,2,1)
 hold on; grid on; box on;
-plot([1 size(semc_allsamples,3)], [0.6 0.6], 'k--', 'linewidth', 1)
+plot([0 size(semc_allsamples,3)], [0.6 0.6], 'k--', 'linewidth', 1)
 y_neg_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,1)); % error in the negative y-direction
 y_pos_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,2)); % error in the positive y-direction
-errorbar((1:size(semc_allsamples,3))', posterior_mean(:,1), y_neg_a1, y_pos_a1, '-s','MarkerSize',5,...
+errorbar((1:size(posterior_mean,1))', posterior_mean(:,1), y_neg_a1, y_pos_a1, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'SEMC estimated values'', 'linewidth', 2)
-xlim([1 size(semc_allsamples,3)])
+legend('True value', 'SEMC estimated values', 'linewidth', 2)
+xlim([0 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Primary stiffness, k [N/m]')
 set(gca, 'fontsize', 18)
 
 subplot(1,2,2)
 hold on; grid on; box on;
-plot([1 size(semc_allsamples,3)], [1.0 1.0], 'k--', 'linewidth', 1)
+plot([0 size(semc_allsamples,3)], [1.0 1.0], 'k--', 'linewidth', 1)
 y_neg_b1 = abs(posterior_mean(:,2) - posterior_bounds_k12(:,1)); % error in the negative y-direction
 y_pos_b1 = abs(posterior_mean(:,2) - posterior_bounds_k12(:,2)); % error in the positive y-direction
-errorbar((1:size(semc_allsamples,3))', posterior_mean(:,2), y_neg_b1, y_pos_b1, '-s','MarkerSize',5,...
+errorbar((1:size(posterior_mean,1))', posterior_mean(:,2), y_neg_b1, y_pos_b1, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
 legend('True value', 'SEMC estimated values', 'linewidth', 2)
-xlim([1 size(semc_allsamples,3)])
+xlim([0 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Secondary stiffness, k_{12} [N/m]')
+set(gca, 'fontsize', 18)
+
+figure;
+subplot(1,2,1)
+hold on; grid on; box on;
+plot([0 size(semc_allsamples,3)], [0.1*model_1([m,k]) 0.1*model_1([m,k])], 'k--', 'linewidth', 1)
+y_neg_a2 = abs(posterior_mean(:,3) - posterior_bounds_sigma1(:,1)); % error in the negative y-direction
+y_pos_a2 = abs(posterior_mean(:,3) - posterior_bounds_sigma1(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean,1))', posterior_mean(:,3), y_neg_a2, y_pos_a2, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
+legend('True value', 'SEMC estimated values', 'linewidth', 2)
+xlim([0 size(semc_allsamples,3)])
+xlabel('Iteration, j')
+ylabel('Noise standard deviation 1, \sigma_{1} [Hz]')
+set(gca, 'fontsize', 18)
+
+subplot(1,2,2)
+hold on; grid on; box on;
+plot([0 size(semc_allsamples,3)], [0.1*model_2([m,k,k_12]) 0.1*model_2([m,k,k_12])], 'k--', 'linewidth', 1)
+y_neg_b2 = abs(posterior_mean(:,4) - posterior_bounds_sigma2(:,1)); % error in the negative y-direction
+y_pos_b2 = abs(posterior_mean(:,4) - posterior_bounds_sigma2(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean,1))', posterior_mean(:,4), y_neg_b2, y_pos_b2, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
+legend('True value', 'SEMC estimated values', 'linewidth', 2)
+xlim([0 size(semc_allsamples,3)])
+xlabel('Iteration, j')
+ylabel('Noise standard deviation 2, \sigma_{2} [Hz]')
 set(gca, 'fontsize', 18)
 
 %% SEMC Statistics
@@ -242,7 +266,7 @@ legend('Target acceptance rate', 'Optimum acceptance limits', 'SEMC acceptance r
 title('Plot of Acceptance rates')
 xlabel('Iteration number, j')
 ylabel('Acceptance rate')
-xlim([1 5])
+xlim([1 6])
 set(gca, 'fontsize', 18)
 
 %% Save the data:
