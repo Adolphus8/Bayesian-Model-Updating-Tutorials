@@ -1,5 +1,5 @@
 function [output] = SEMCsampler(varargin)
-%% Sequential Ensemble Monte Carlo Dynamical (SEMC) sampler
+%% Sequential Ensemble Monte Carlo (SEMC) sampler
 %
 % This program implements a method based on the original Sequential Monte
 % Carlo (SMC) sampling class (see paper by Moral et. al (2006): Sequential 
@@ -24,7 +24,7 @@ pnames = {'nsamples','loglikelihoods','dynamic_model','inverse_model',...
           'priorpdf','priorrnd','burnin','lastburnin','stepsize','thinchain'};
 
 % Define default values:      
-dflts =  {[], [], @(x) x, @(x) x, [], [], [], 0, 2, 3}; 
+dflts =  {[], [], @(x) x, @(x) x, [], [], 0, 0, 2, 3}; 
 
 
 [nsamples,loglikelihoods,dynamic_model,inverse_model,priorpdf,prior_rnd,...
@@ -74,6 +74,11 @@ allsamples(:,:,1) = thetaj;
 
 % Samples from predictive distribution, P(theta(t+1)|Data(1:t)):
 predictive_samples = zeros(size(thetaj,1), size(thetaj,2), size(loglikelihoods,1)); 
+
+% Resampling indicator vector:
+indicator = zeros(length(loglikelihoods), 1);
+% Note: This indicator vector returns a 1 for the iteration(s) where
+% resampling is initiated and 0 otherwise.
 
 % Pre-sampling error check:
 test_func = @(in) dynamic_model(inverse_model(in));
@@ -134,6 +139,7 @@ end
 
 thetaj = thetaj_resampled;
 wj_norm = (1/nsamples).*ones(nsamples,1);
+indicator(iter) = 1;
 
 end
 
@@ -156,7 +162,7 @@ for i = 1:nsamples
 start(i,:) = thetaj(idx(i), :);
 end
 
-% Initiate the EMCMC sampler:
+% Initiate the EMCMC sampler (nsamples x dim x 1):
 [samples,logp,acceptance_rate] = EMCMCsampler(start, log_posterior, 1, priorpdf, ...
                                              'StepSize', stepsize,...
                                              'BurnIn', burnin,...
@@ -179,7 +185,13 @@ pred_pdf = @(x) exp(log_posterior(inverse_model(x)));
 %% Prepare for the next iteration:
 
 c_a = (acceptance_rate - ((0.21./Dimensions) + 0.23));
-stepsize = stepsize.*exp(c_a);
+stepsize_nominal = stepsize.*exp(c_a);
+
+if stepsize_nominal <= 1
+stepsize = 1.01;
+else
+stepsize = stepsize_nominal;
+end
     
 count = count+1;
 allsamples(:,:,count) = thetaj1;
@@ -196,6 +208,7 @@ output.allsamples = allsamples;         % To only show all filter samples across
 output.prediction = predictive_samples; % To only show all prediction samples across all iterations
 output.acceptance = acceptance;         % To show the mean acceptance rates for all iterations
 output.step = step;                     % To show the values of step-size
+output.indicator = indicator;           % To indicate the iterations whereby resampling took place (denoted by 1s).
 
 fprintf('End of SEMC procedure. \n\n');
 

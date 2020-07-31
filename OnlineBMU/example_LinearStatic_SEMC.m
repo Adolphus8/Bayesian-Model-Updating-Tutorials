@@ -18,7 +18,8 @@
 % measurement, but also illustrates how the posterior for each epistemic
 % parameter changes with increased measurements. 
 %
-% Here, Bayesian Model Updating is performed via SEMC sampler.
+% Here, Bayesian Model Updating is performed via SEMC sampler and the 
+% results at each iteration will be compared against that of TMCMC sampler.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -66,9 +67,9 @@ time_step = 15;
 % To create array of Likelihood functions:
 logL = cell(time_step,1);
 for i = 1:time_step
-idx = i; % index variable
-logL{i} = @(x) - 0.5 .* (1./x(:,2)).^2 .*(measurements(idx) - model(x(:,1),displacement(idx)))' *...
-                                         (measurements(idx) - model(x(:,1),displacement(idx))) -...
+    
+logL{i} = @(x) - 0.5 .* (1./x(:,2)).^2 .*(measurements(i) - model(x(:,1),displacement(i)))' *...
+                                         (measurements(i) - model(x(:,1),displacement(i))) -...
                                           log(sqrt(2*pi).*x(:,2)); 
 end
 
@@ -87,37 +88,85 @@ semc_allsamples = SEMC.allsamples;
 timeSEMC = toc;
 fprintf('Time elapsed is for the SEMC sampler: %f \n',timeSEMC)
 
-%% Analysis of the model updating:
+%% Perform Offline Bayesian Updating via TMCMC:
 
-least_squares = abs(displacement\measurements);
-posterior_mean = zeros(time_step,size(semc_allsamples,2));
-posterior_std = zeros(time_step,size(semc_allsamples,2));
-posterior_bounds_k = zeros(time_step,2);
-posterior_bounds_sigma = zeros(time_step,2);
+for i = 1:time_step
+    
+fprintf('Commence Offline BMU iteration t = %d \n', i)
+
+logl = @(x) - 0.5 .* (1./x(:,2)).^2 .*(measurements(1:i) - model(x(:,1),displacement(1:i)))' *...
+                                      (measurements(1:i) - model(x(:,1),displacement(1:i))) -...
+                                       log(sqrt(2*pi).*x(:,2)); 
+                                   
+% Start TMCMC sampler:
+tic;
+TMCMC{i} = TMCMCsampler('nsamples',Nsamples,'loglikelihood',logl,...
+                   'priorpdf',prior_pdf,'priorrnd',prior_rnd,...
+                   'burnin',0);
+tmcmc_allsamples(:,:,i) = TMCMC{i}.samples;
+timeTMCMC(i) = toc;
+fprintf('Time elapsed is for the TMCMC sampler: %f \n',timeTMCMC(i))                                  
+
+end
+
+%% Analysis of samples:
+
+% Analysis of samples from SEMC sampler:
+posterior_mean_semc = zeros(time_step,size(semc_allsamples,2));
+posterior_std_semc = zeros(time_step,size(semc_allsamples,2));
+posterior_bounds_k_semc = zeros(time_step,2);
+posterior_bounds_sigma_semc = zeros(time_step,2);
 
 for idx = 1:time_step
-posterior_mean(idx,1) = mean(semc_allsamples(:,1,idx+1));
-posterior_mean(idx,2) = mean(semc_allsamples(:,2,idx+1));
+posterior_mean_semc(idx,1) = mean(semc_allsamples(:,1,idx+1));
+posterior_mean_semc(idx,2) = mean(semc_allsamples(:,2,idx+1));
 
-posterior_std(idx,1) = std(semc_allsamples(:,1,idx+1));
-posterior_std(idx,2) = std(semc_allsamples(:,2,idx+1));
+posterior_std_semc(idx,1) = std(semc_allsamples(:,1,idx+1));
+posterior_std_semc(idx,2) = std(semc_allsamples(:,2,idx+1));
 
-posterior_bounds_k(idx,:) = prctile(semc_allsamples(:,1,idx+1), [5, 95]);
-posterior_bounds_sigma(idx,:) = prctile(semc_allsamples(:,2,idx+1), [5, 95]);
+posterior_bounds_k_semc(idx,:) = prctile(semc_allsamples(:,1,idx+1), [5, 95]);
+posterior_bounds_sigma_semc(idx,:) = prctile(semc_allsamples(:,2,idx+1), [5, 95]);
 end
-posterior_cov = (posterior_std./posterior_mean).*100;
+posterior_cov_semc = (posterior_std_semc./posterior_mean_semc).*100;
+
+% Analysis of samples from SEMC sampler:
+posterior_mean_tmcmc = zeros(time_step,size(tmcmc_allsamples,2));
+posterior_std_tmcmc = zeros(time_step,size(tmcmc_allsamples,2));
+posterior_bounds_k_tmcmc = zeros(time_step,2);
+posterior_bounds_sigma_tmcmc = zeros(time_step,2);
+
+for idx = 1:time_step
+posterior_mean_tmcmc(idx,1) = mean(tmcmc_allsamples(:,1,idx));
+posterior_mean_tmcmc(idx,2) = mean(tmcmc_allsamples(:,2,idx));
+
+posterior_std_tmcmc(idx,1) = std(tmcmc_allsamples(:,1,idx));
+posterior_std_tmcmc(idx,2) = std(tmcmc_allsamples(:,2,idx));
+
+posterior_bounds_k_tmcmc(idx,:) = prctile(tmcmc_allsamples(:,1,idx), [5, 95]);
+posterior_bounds_sigma_tmcmc(idx,:) = prctile(tmcmc_allsamples(:,2,idx), [5, 95]);
+end
+posterior_cov_tmcmc = (posterior_std_tmcmc./posterior_mean_tmcmc).*100;
+
+%% Analysis of the model updating:
+
+% Least squares estimation of k:
+least_squares = abs(displacement\measurements);
 
 % To plot the estimates of k and sigma wih the theoretical values:
 figure;
 subplot(1,2,1)
 hold on; grid on; box on;
-plot([0 size(posterior_mean,1)+1], [stiffness stiffness], 'k--', 'linewidth', 1)
-plot([0 size(posterior_mean,1)+1], [least_squares least_squares], 'r--', 'linewidth', 1)
-y_neg_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,1)); % error in the negative y-direction
-y_pos_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,2)); % error in the positive y-direction
-errorbar((1:size(posterior_mean,1))', posterior_mean(:,1), y_neg_a1, y_pos_a1, '-s','MarkerSize',5,...
+plot([0 size(posterior_mean_semc,1)+1], [stiffness stiffness], 'k--', 'linewidth', 1.5)
+plot([0 size(posterior_mean_semc,1)+1], [least_squares least_squares], 'g--', 'linewidth', 1.5)
+y_neg_a1 = abs(posterior_mean_tmcmc(:,1) - posterior_bounds_k_tmcmc(:,1)); % error in the negative y-direction
+y_pos_a1 = abs(posterior_mean_tmcmc(:,1) - posterior_bounds_k_tmcmc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_tmcmc,1))', posterior_mean_tmcmc(:,1), y_neg_a1, y_pos_a1, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'Least squares estimate', 'SEMC estimated values', 'linewidth', 2)
+y_neg_a2 = abs(posterior_mean_semc(:,1) - posterior_bounds_k_semc(:,1)); % error in the negative y-direction
+y_pos_a2 = abs(posterior_mean_semc(:,1) - posterior_bounds_k_semc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_semc,1))', posterior_mean_semc(:,1), y_neg_a2, y_pos_a2, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
+legend('True value', 'Least squares estimate', 'TMCMC estimated values', 'SEMC estimated values', 'linewidth', 2)
 xlim([0 16])
 xlabel('Iteration, j')
 ylabel('Stiffness, k [N/m]')
@@ -125,12 +174,16 @@ set(gca, 'fontsize', 18)
 
 subplot(1,2,2)
 hold on; grid on; box on;
-plot([0 size(posterior_mean,1)+1], [noise_sd noise_sd], 'k--', 'linewidth', 1)
-y_neg_b = abs(posterior_mean(:,2) - posterior_bounds_sigma(:,1)); % error in the negative y-direction
-y_pos_b = abs(posterior_mean(:,2) - posterior_bounds_sigma(:,2)); % error in the positive y-direction
-errorbar((1:size(posterior_mean,1))', posterior_mean(:,2), y_neg_b, y_pos_b, '-s','MarkerSize',5,...
+plot([0 size(posterior_mean_semc,1)+1], [noise_sd noise_sd], 'k--', 'linewidth', 1.5)
+y_neg_b1 = abs(posterior_mean_tmcmc(:,2) - posterior_bounds_sigma_tmcmc(:,1)); % error in the negative y-direction
+y_pos_b1 = abs(posterior_mean_tmcmc(:,2) - posterior_bounds_sigma_tmcmc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_tmcmc,1))', posterior_mean_tmcmc(:,2), y_neg_b1, y_pos_b1, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'SEMC estimated values', 'linewidth', 2)
+y_neg_b2 = abs(posterior_mean_semc(:,2) - posterior_bounds_sigma_semc(:,1)); % error in the negative y-direction
+y_pos_b2 = abs(posterior_mean_semc(:,2) - posterior_bounds_sigma_semc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_semc,1))', posterior_mean_semc(:,2), y_neg_b2, y_pos_b2, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
+legend('True value', 'TMCMC estimated values', 'SEMC estimated values','linewidth', 2)
 xlim([0 16])
 xlabel('Iteration, j')
 ylabel('Noise standard deviation, \sigma [N]')
@@ -139,15 +192,34 @@ set(gca, 'fontsize', 18)
 %% Model Update
 
 figure;
+subplot(1,2,1)
+hold on; box on; grid on;
+for i = 1:size(tmcmc_allsamples,1)
+plot(disp, model(tmcmc_allsamples(i,1,end),disp),'color','#C0C0C0', 'LineWidth', 1)
+end
+legend('TMCMC samples','Linewidth', 2)
+plot(disp, model(stiffness,disp), 'k --', 'LineWidth', 1, 'DisplayName', 'True measurements')
+plot(disp, model(least_squares,disp), 'c --', 'LineWidth', 1, 'DisplayName', 'Least-squares estimate')
+plot(disp, model(posterior_mean_tmcmc(15,1),disp), 'b', 'LineWidth', 1, 'DisplayName', 'TMCMC mean estimate')
+plot(disp, model(posterior_bounds_k_tmcmc(15,1),disp), 'm', 'LineWidth', 1, 'DisplayName', '5^{th} percentile')
+plot(disp, model(posterior_bounds_k_tmcmc(15,2),disp), 'm', 'LineWidth', 1, 'DisplayName', '95^{th} percentile')
+scatter(displacement, measurements, 13, 'r', 'filled', 'DisplayName', 'Noisy measurements')
+xlim([0 0.08])
+xlabel('Displacement, d [m]')
+ylabel('Force, F [N]')
+set(gca, 'Fontsize', 16)
+
+subplot(1,2,2)
 hold on; box on; grid on;
 for i = 1:size(semc_allsamples,1)
 plot(disp, model(semc_allsamples(i,1,end),disp),'color','#C0C0C0', 'LineWidth', 1)
 end
 legend('SEMC samples','Linewidth', 2)
 plot(disp, model(stiffness,disp), 'k --', 'LineWidth', 1, 'DisplayName', 'True measurements')
-plot(disp, model(least_squares,disp), 'c', 'LineWidth', 1, 'DisplayName', 'Least-squares estimate')
-plot(disp, model(posterior_bounds_k(15,1),disp), 'm', 'LineWidth', 1, 'DisplayName', '5^{th} percentile')
-plot(disp, model(posterior_bounds_k(15,2),disp), 'm', 'LineWidth', 1, 'DisplayName', '95^{th} percentile')
+plot(disp, model(least_squares,disp), 'c --', 'LineWidth', 1, 'DisplayName', 'Least-squares estimate')
+plot(disp, model(posterior_mean_semc(15,1),disp), 'b', 'LineWidth', 1, 'DisplayName', 'SEMC mean estimate')
+plot(disp, model(posterior_bounds_k_semc(15,1),disp), 'm', 'LineWidth', 1, 'DisplayName', '5^{th} percentile')
+plot(disp, model(posterior_bounds_k_semc(15,2),disp), 'm', 'LineWidth', 1, 'DisplayName', '95^{th} percentile')
 scatter(displacement, measurements, 13, 'r', 'filled', 'DisplayName', 'Noisy measurements')
 xlim([0 0.08])
 xlabel('Displacement, d [m]')
@@ -176,4 +248,4 @@ set(gca, 'fontsize', 18)
 
 %% Save the data:
 
-save('example_LinearStatic_SEMC');
+save('example_LinearStatic_SEMC_m');

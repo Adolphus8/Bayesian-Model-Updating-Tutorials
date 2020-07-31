@@ -128,7 +128,31 @@ SEMC = SEMCsampler('nsamples',Nsamples,'loglikelihoods',logl,...
 semc_samples = SEMC.samples;
 semc_allsamples = SEMC.allsamples;
 timeSEMC = toc;
-fprintf('Time elapsed is for the TMCMC sampler: %f \n',timeSEMC)
+fprintf('Time elapsed is for the SEMC sampler: %f \n',timeSEMC)
+
+%% Perform Offline Bayesian Updating via TMCMC:
+
+% To create a cell array of Likelihood functions:
+loglike{1} = @(x) logL(x, measurements(1:3,:));
+loglike{2} = @(x) logL(x, measurements(1:7,:));
+loglike{3} = @(x) logL(x, measurements(1:12,:));
+loglike{4} = @(x) logL(x, measurements(1:13,:));
+loglike{5} = @(x) logL(x, measurements(1:15,:));
+
+for i = 1:length(logl)
+    
+fprintf('Commence Offline BMU iteration t = %d \n', i)
+                                   
+% Start TMCMC sampler:
+tic;
+TMCMC{i} = TMCMCsampler('nsamples',Nsamples,'loglikelihood',loglike{i},...
+                   'priorpdf',prior_pdf,'priorrnd',prior_rnd,...
+                   'burnin',0);
+tmcmc_allsamples(:,:,i) = TMCMC{i}.samples;
+timeTMCMC(i) = toc;
+fprintf('Time elapsed is for the TMCMC sampler: %f \n',timeTMCMC(i))                                  
+
+end
 
 %% Plot the combined Scatterplot matrix:
 
@@ -155,56 +179,73 @@ set(gca,'FontSize',16)
 
 end
 
-%% Model Update
+%% Analysis of samples:
 
-update_model_1 = @(x) sqrt(x./m);
-update_model_2 = @(x) sqrt((x(:,1) + 2.*x(:,2))./m);
-
-figure;
-hold on; box on; grid on
-scatter(update_model_1(semc_samples(:,1)),...
-update_model_2([semc_samples(:,1),semc_samples(:,2)]), 10, 'b', 'filled')
-scatter(measurements(:,1), measurements(:,2), 10, 'r', 'filled');
-plot(model_1([m,k]), model_2([m,k,k_12]), 'k +','LineWidth', 2);
-xlabel('\omega_1^{noisy} [Hz]')
-ylabel('\omega_2^{noisy} [Hz]')
-legend('SEMC Model Update','Noisy eigenfrequencies', 'True eigenfrequency','LineWidth',2)
-set(gca, 'fontsize', 15)
-
-posterior_mean = zeros(size(logl,2),size(semc_allsamples,2));
-posterior_std = zeros(size(logl,2),size(semc_allsamples,2));
-posterior_bounds_k = zeros(size(logl,2),2);
-posterior_bounds_k12 = zeros(size(logl,2),2);
-posterior_bounds_sigma1 = zeros(size(logl,2),2);
-posterior_bounds_sigma2 = zeros(size(logl,2),2);
+posterior_mean_semc = zeros(size(logl,2),size(semc_allsamples,2));
+posterior_std_semc = zeros(size(logl,2),size(semc_allsamples,2));
+posterior_bounds_k_semc = zeros(size(logl,2),2);
+posterior_bounds_k12_semc = zeros(size(logl,2),2);
+posterior_bounds_sigma1_semc = zeros(size(logl,2),2);
+posterior_bounds_sigma2_semc = zeros(size(logl,2),2);
 
 for idx = 1:size(logl,2)
-posterior_mean(idx,1) = mean(semc_allsamples(:,1,idx+1));
-posterior_mean(idx,2) = mean(semc_allsamples(:,2,idx+1));
-posterior_mean(idx,3) = mean(semc_allsamples(:,3,idx+1));
-posterior_mean(idx,4) = mean(semc_allsamples(:,4,idx+1));
+posterior_mean_semc(idx,1) = mean(semc_allsamples(:,1,idx+1));
+posterior_mean_semc(idx,2) = mean(semc_allsamples(:,2,idx+1));
+posterior_mean_semc(idx,3) = mean(semc_allsamples(:,3,idx+1));
+posterior_mean_semc(idx,4) = mean(semc_allsamples(:,4,idx+1));
 
-posterior_std(idx,1) = std(semc_allsamples(:,1,idx+1));
-posterior_std(idx,2) = std(semc_allsamples(:,2,idx+1));
-posterior_std(idx,3) = std(semc_allsamples(:,3,idx+1));
-posterior_std(idx,4) = std(semc_allsamples(:,4,idx+1));
+posterior_std_semc(idx,1) = std(semc_allsamples(:,1,idx+1));
+posterior_std_semc(idx,2) = std(semc_allsamples(:,2,idx+1));
+posterior_std_semc(idx,3) = std(semc_allsamples(:,3,idx+1));
+posterior_std_semc(idx,4) = std(semc_allsamples(:,4,idx+1));
 
-posterior_bounds_k(idx,:) = prctile(semc_allsamples(:,1,idx+1), [5, 95]);
-posterior_bounds_k12(idx,:) = prctile(semc_allsamples(:,2,idx+1), [5, 95]);
-posterior_bounds_sigma1(idx,:) = prctile(semc_allsamples(:,3,idx+1), [5, 95]);
-posterior_bounds_sigma2(idx,:) = prctile(semc_allsamples(:,4,idx+1), [5, 95]);
+posterior_bounds_k_semc(idx,:) = prctile(semc_allsamples(:,1,idx+1), [5, 95]);
+posterior_bounds_k12_semc(idx,:) = prctile(semc_allsamples(:,2,idx+1), [5, 95]);
+posterior_bounds_sigma1_semc(idx,:) = prctile(semc_allsamples(:,3,idx+1), [5, 95]);
+posterior_bounds_sigma2_semc(idx,:) = prctile(semc_allsamples(:,4,idx+1), [5, 95]);
 end
-posterior_cov = (posterior_std./posterior_mean).*100;
+posterior_cov_semc = (posterior_std_semc./posterior_mean_semc).*100;
+
+posterior_mean_tmcmc = zeros(size(logl,2),size(tmcmc_allsamples,2));
+posterior_std_tmcmc = zeros(size(logl,2),size(tmcmc_allsamples,2));
+posterior_bounds_k_tmcmc = zeros(size(logl,2),2);
+posterior_bounds_k12_tmcmc = zeros(size(logl,2),2);
+posterior_bounds_sigma1_tmcmc = zeros(size(logl,2),2);
+posterior_bounds_sigma2_tmcmc = zeros(size(logl,2),2);
+
+for idx = 1:size(logl,2)
+posterior_mean_tmcmc(idx,1) = mean(tmcmc_allsamples(:,1,idx));
+posterior_mean_tmcmc(idx,2) = mean(tmcmc_allsamples(:,2,idx));
+posterior_mean_tmcmc(idx,3) = mean(tmcmc_allsamples(:,3,idx));
+posterior_mean_tmcmc(idx,4) = mean(tmcmc_allsamples(:,4,idx));
+
+posterior_std_tmcmc(idx,1) = std(tmcmc_allsamples(:,1,idx));
+posterior_std_tmcmc(idx,2) = std(tmcmc_allsamples(:,2,idx));
+posterior_std_tmcmc(idx,3) = std(tmcmc_allsamples(:,3,idx));
+posterior_std_tmcmc(idx,4) = std(tmcmc_allsamples(:,4,idx));
+
+posterior_bounds_k_tmcmc(idx,:) = prctile(tmcmc_allsamples(:,1,idx), [5, 95]);
+posterior_bounds_k12_tmcmc(idx,:) = prctile(tmcmc_allsamples(:,2,idx), [5, 95]);
+posterior_bounds_sigma1_tmcmc(idx,:) = prctile(tmcmc_allsamples(:,3,idx), [5, 95]);
+posterior_bounds_sigma2_tmcmc(idx,:) = prctile(tmcmc_allsamples(:,4,idx), [5, 95]);
+end
+posterior_cov_tmcmc = (posterior_std_tmcmc./posterior_mean_tmcmc).*100;
+
+%% Analysis of the model updating:
 
 figure;
 subplot(1,2,1)
 hold on; grid on; box on;
 plot([0 size(semc_allsamples,3)], [0.6 0.6], 'k--', 'linewidth', 1)
-y_neg_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,1)); % error in the negative y-direction
-y_pos_a1 = abs(posterior_mean(:,1) - posterior_bounds_k(:,2)); % error in the positive y-direction
-errorbar((1:size(posterior_mean,1))', posterior_mean(:,1), y_neg_a1, y_pos_a1, '-s','MarkerSize',5,...
+y_neg_a1i = abs(posterior_mean_tmcmc(:,1) - posterior_bounds_k_tmcmc(:,1)); % error in the negative y-direction
+y_pos_a1i = abs(posterior_mean_tmcmc(:,1) - posterior_bounds_k_tmcmc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_tmcmc,1))', posterior_mean_tmcmc(:,1), y_neg_a1i, y_pos_a1i, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'SEMC estimated values', 'linewidth', 2)
+y_neg_a1ii = abs(posterior_mean_semc(:,1) - posterior_bounds_k_semc(:,1)); % error in the negative y-direction
+y_pos_a1ii = abs(posterior_mean_semc(:,1) - posterior_bounds_k_semc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_semc,1))', posterior_mean_semc(:,1), y_neg_a1ii, y_pos_a1ii, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
+legend('True value', 'TMCMC estimated values', 'SEMC estimated values', 'linewidth', 2)
 xlim([0 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Primary stiffness, k [N/m]')
@@ -213,11 +254,15 @@ set(gca, 'fontsize', 18)
 subplot(1,2,2)
 hold on; grid on; box on;
 plot([0 size(semc_allsamples,3)], [1.0 1.0], 'k--', 'linewidth', 1)
-y_neg_b1 = abs(posterior_mean(:,2) - posterior_bounds_k12(:,1)); % error in the negative y-direction
-y_pos_b1 = abs(posterior_mean(:,2) - posterior_bounds_k12(:,2)); % error in the positive y-direction
-errorbar((1:size(posterior_mean,1))', posterior_mean(:,2), y_neg_b1, y_pos_b1, '-s','MarkerSize',5,...
+y_neg_b1i = abs(posterior_mean_tmcmc(:,2) - posterior_bounds_k12_tmcmc(:,1)); % error in the negative y-direction
+y_pos_b1i = abs(posterior_mean_tmcmc(:,2) - posterior_bounds_k12_tmcmc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_tmcmc,1))', posterior_mean_tmcmc(:,2), y_neg_b1i, y_pos_b1i, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'SEMC estimated values', 'linewidth', 2)
+y_neg_b1ii = abs(posterior_mean_semc(:,2) - posterior_bounds_k12_semc(:,1)); % error in the negative y-direction
+y_pos_b1ii = abs(posterior_mean_semc(:,2) - posterior_bounds_k12_semc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_semc,1))', posterior_mean_semc(:,2), y_neg_b1ii, y_pos_b1ii, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
+legend('True value', 'TMCMC estimated values', 'SEMC estimated values', 'linewidth', 2)
 xlim([0 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Secondary stiffness, k_{12} [N/m]')
@@ -227,11 +272,15 @@ figure;
 subplot(1,2,1)
 hold on; grid on; box on;
 plot([0 size(semc_allsamples,3)], [0.1*model_1([m,k]) 0.1*model_1([m,k])], 'k--', 'linewidth', 1)
-y_neg_a2 = abs(posterior_mean(:,3) - posterior_bounds_sigma1(:,1)); % error in the negative y-direction
-y_pos_a2 = abs(posterior_mean(:,3) - posterior_bounds_sigma1(:,2)); % error in the positive y-direction
-errorbar((1:size(posterior_mean,1))', posterior_mean(:,3), y_neg_a2, y_pos_a2, '-s','MarkerSize',5,...
+y_neg_a2i = abs(posterior_mean_tmcmc(:,3) - posterior_bounds_sigma1_tmcmc(:,1)); % error in the negative y-direction
+y_pos_a2i = abs(posterior_mean_tmcmc(:,3) - posterior_bounds_sigma1_tmcmc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_tmcmc,1))', posterior_mean_tmcmc(:,3), y_neg_a2i, y_pos_a2i, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'SEMC estimated values', 'linewidth', 2)
+y_neg_a2ii = abs(posterior_mean_semc(:,3) - posterior_bounds_sigma1_semc(:,1)); % error in the negative y-direction
+y_pos_a2ii = abs(posterior_mean_semc(:,3) - posterior_bounds_sigma1_semc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_semc,1))', posterior_mean_semc(:,3), y_neg_a2ii, y_pos_a2ii, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
+legend('True value', 'TMCMC estimated values', 'SEMC estimated values', 'linewidth', 2)
 xlim([0 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Noise standard deviation 1, \sigma_{1} [Hz]')
@@ -240,15 +289,47 @@ set(gca, 'fontsize', 18)
 subplot(1,2,2)
 hold on; grid on; box on;
 plot([0 size(semc_allsamples,3)], [0.1*model_2([m,k,k_12]) 0.1*model_2([m,k,k_12])], 'k--', 'linewidth', 1)
-y_neg_b2 = abs(posterior_mean(:,4) - posterior_bounds_sigma2(:,1)); % error in the negative y-direction
-y_pos_b2 = abs(posterior_mean(:,4) - posterior_bounds_sigma2(:,2)); % error in the positive y-direction
-errorbar((1:size(posterior_mean,1))', posterior_mean(:,4), y_neg_b2, y_pos_b2, '-s','MarkerSize',5,...
+y_neg_b2i = abs(posterior_mean_tmcmc(:,4) - posterior_bounds_sigma2_tmcmc(:,1)); % error in the negative y-direction
+y_pos_b2i = abs(posterior_mean_tmcmc(:,4) - posterior_bounds_sigma2_tmcmc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_tmcmc,1))', posterior_mean_tmcmc(:,4), y_neg_b2i, y_pos_b2i, '-s','MarkerSize',5,...
     'MarkerEdgeColor','blue','MarkerFaceColor','blue', 'linewidth',1);
-legend('True value', 'SEMC estimated values', 'linewidth', 2)
+y_neg_b2ii = abs(posterior_mean_semc(:,4) - posterior_bounds_sigma2_semc(:,1)); % error in the negative y-direction
+y_pos_b2ii = abs(posterior_mean_semc(:,4) - posterior_bounds_sigma2_semc(:,2)); % error in the positive y-direction
+errorbar((1:size(posterior_mean_semc,1))', posterior_mean_semc(:,4), y_neg_b2ii, y_pos_b2ii, '-s','MarkerSize',5,...
+    'MarkerEdgeColor','red','MarkerFaceColor','red', 'linewidth',1);
+legend('True value', 'TMCMC estimated values', 'SEMC estimated values', 'linewidth', 2)
 xlim([0 size(semc_allsamples,3)])
 xlabel('Iteration, j')
 ylabel('Noise standard deviation 2, \sigma_{2} [Hz]')
 set(gca, 'fontsize', 18)
+
+%% Model Update
+
+update_model_1 = @(x) sqrt(x./m);
+update_model_2 = @(x) sqrt((x(:,1) + 2.*x(:,2))./m);
+
+figure;
+subplot(1,2,1)
+hold on; box on; grid on
+scatter(update_model_1(tmcmc_allsamples(:,1,5)),...
+update_model_2([tmcmc_allsamples(:,1,5),tmcmc_allsamples(:,2,5)]), 10, 'b', 'filled')
+scatter(measurements(:,1), measurements(:,2), 10, 'r', 'filled');
+plot(model_1([m,k]), model_2([m,k,k_12]), 'k +','LineWidth', 2);
+xlabel('\omega_1^{noisy} [Hz]')
+ylabel('\omega_2^{noisy} [Hz]')
+legend('TMCMC Model Update','Noisy eigenfrequencies', 'True eigenfrequency','LineWidth',2)
+set(gca, 'fontsize', 15)
+
+subplot(1,2,2)
+hold on; box on; grid on
+scatter(update_model_1(semc_samples(:,1)),...
+update_model_2([semc_samples(:,1),semc_samples(:,2)]), 10, 'b', 'filled')
+scatter(measurements(:,1), measurements(:,2), 10, 'r', 'filled');
+plot(model_1([m,k]), model_2([m,k,k_12]), 'k +','LineWidth', 2);
+xlabel('\omega_1^{noisy} [Hz]')
+ylabel('\omega_2^{noisy} [Hz]')
+legend('SEMC Model Update','Noisy eigenfrequencies', 'True eigenfrequency','LineWidth',2)
+set(gca, 'fontsize', 15)
 
 %% SEMC Statistics
 
@@ -271,4 +352,4 @@ set(gca, 'fontsize', 18)
 
 %% Save the data:
 
-save('example_CoupledOscillator_SEMC');
+save('example_CoupledOscillator_SEMC_m');
