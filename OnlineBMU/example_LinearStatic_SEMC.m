@@ -96,7 +96,7 @@ fprintf('Commence Offline BMU iteration t = %d \n', i)
 
 logl = @(x) - 0.5 .* (1./x(:,2)).^2 .*(measurements(1:i) - model(x(:,1),displacement(1:i)))' *...
                                       (measurements(1:i) - model(x(:,1),displacement(1:i))) -...
-                                       log(sqrt(2*pi).*x(:,2)); 
+                                       size(measurements(1:i),1).*log(sqrt(2*pi).*x(:,2)); 
                                    
 % Start TMCMC sampler:
 tic;
