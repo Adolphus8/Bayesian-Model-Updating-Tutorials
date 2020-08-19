@@ -348,6 +348,7 @@ title('Plot of Acceptance rates')
 xlabel('Iteration number, j')
 ylabel('Acceptance rate')
 xlim([1 6])
+ylim([0.1 0.7])
 set(gca, 'fontsize', 18)
 
 %% Save the data:
