@@ -40,6 +40,10 @@ This tutorial presents a 2-by-2 square [matrix](http://latex.codecogs.com/svg.la
 
 3. To compare the model updating results obtained through the use of MCMC, TMCMC, and SMC.
 
+### 3) Online Bayesian Model Updating:
+
+This tutorial presents a numerous simple engineering set-ups to show the implementation of On-line Bayesian inference (i.e. when data is collected continuously) using Sequential Ensemble Monte Carlo (SEMC) sampler vs the standard TMCMC sampler.
+
 ## Reference(s):
 * A. Lye, A. Cicirello, and E. Patelli (2021). Sampling methods for solving Bayesian model updating problems: A tutorial. *Mechanical Systems and Signal Processing, 159*, 107760. doi: [10.1016/j.ymssp.2021.107760](https://doi.org/10.1016/j.ymssp.2021.107760)
 
