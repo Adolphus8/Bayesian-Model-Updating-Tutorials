@@ -40,6 +40,8 @@ This tutorial presents a 2-by-2 square [matrix](http://latex.codecogs.com/svg.la
 
 3. To compare the model updating results obtained through the use of MCMC, TMCMC, and SMC.
 
+## Reference(s):
+* A. Lye, A. Cicirello, and E. Patelli (2021). Sampling methods for solving Bayesian model updating problems: A tutorial. *Mechanical Systems and Signal Processing, 159*, 107760. doi: [10.1016/j.ymssp.2021.107760](https://doi.org/10.1016/j.ymssp.2021.107760)
 
 ## Author:
 * Name: Adolphus Lye
