@@ -39,6 +39,12 @@ This tutorial presents a 2-by-2 square [matrix](http://latex.codecogs.com/svg.la
 2. To estimate the solutions to the epistemic parameters: Theta 1 and Theta 2;
 
 3. To compare the model updating results obtained through the use of MCMC, TMCMC, and SMC.
+   
+### 4) Alternative TMCMC Transition criteria:
+
+The work explores a possible alternative transitional criteria for the TMCMC sampler involving the use of the Effective sample size metric. The alternative transitional criteria is such that in transiting from one transitional distribution to another, the Effective sample size has to be half the total sample size. The alternative TMCMC sampler is referred to as the TMCMC-II sampler and it will be implemented on a SDoF structure subjected to an unknown Coulomb friction. The code to be executed is named: "example_SDOF_System_Coulomb_Friction_numerical.m"
+
+The work was presented at the 33rd European Safety and Reliability Conference (ESREL 2023) held in Southampton, United Kingdom.
 
 ## Reference(s):
 * A. Lye, A. Cicirello, and E. Patelli (2021). Sampling methods for solving Bayesian model updating problems: A tutorial. *Mechanical Systems and Signal Processing, 159*, 107760. doi: [10.1016/j.ymssp.2021.107760](https://doi.org/10.1016/j.ymssp.2021.107760)
