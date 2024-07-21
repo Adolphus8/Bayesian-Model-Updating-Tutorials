@@ -48,6 +48,7 @@ The work was presented at the 33rd European Safety and Reliability Conference (E
 
 ## Reference(s):
 * A. Lye, A. Cicirello, and E. Patelli (2021). Sampling methods for solving Bayesian model updating problems: A tutorial. *Mechanical Systems and Signal Processing, 159*, 107760. doi: [10.1016/j.ymssp.2021.107760](https://doi.org/10.1016/j.ymssp.2021.107760)
+* A. Lye, and L. Marino (2023). An investigation into an alternative transition criterion of the Transitional Markov Chain Monte Carlo method for Bayesian model updating. *In Proceedings of the 33rd European Safety and Reliability Conference, 1*. doi: [10.3850/978-981-18-8071-1_P331-cd](https://doi.org/10.3850/978-981-18-8071-1_P331-cd)
 
 ## Author:
 * Name: Adolphus Lye
